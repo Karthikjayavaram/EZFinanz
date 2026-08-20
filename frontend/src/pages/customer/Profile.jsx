@@ -44,6 +44,8 @@ const Profile = () => {
     branchName: ''
   });
   const [showAccountDigits, setShowAccountDigits] = useState(false);
+  const [showBankAcc, setShowBankAcc] = useState(false);
+  const [showConfirmBankAcc, setShowConfirmBankAcc] = useState(false);
   const [bankSaving, setBankSaving] = useState(false);
   const [bankSuccess, setBankSuccess] = useState('');
   const [bankError, setBankError] = useState('');
@@ -542,28 +544,48 @@ const Profile = () => {
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Account Number *</label>
-                  <input
-                    type="password"
-                    name="accountNumber"
-                    value={bankForm.accountNumber}
-                    onChange={handleBankChange}
-                    required
-                    className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono text-xs"
-                    placeholder="Enter account number"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showBankAcc ? 'text' : 'password'}
+                      name="accountNumber"
+                      value={bankForm.accountNumber}
+                      onChange={handleBankChange}
+                      required
+                      className="w-full px-3.5 py-2.5 pr-10 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono text-xs"
+                      placeholder="Enter account number"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowBankAcc(!showBankAcc)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 focus:outline-none cursor-pointer"
+                      title={showBankAcc ? 'Hide account number' : 'Show account number'}
+                    >
+                      {showBankAcc ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5 text-slate-500" />}
+                    </button>
+                  </div>
                 </div>
 
                 <div>
                   <label className="block font-bold text-slate-700 mb-1">Confirm Account Number *</label>
-                  <input
-                    type="text"
-                    name="confirmAccountNumber"
-                    value={bankForm.confirmAccountNumber}
-                    onChange={handleBankChange}
-                    required
-                    className="w-full px-3.5 py-2.5 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono text-xs"
-                    placeholder="Re-enter account number"
-                  />
+                  <div className="relative">
+                    <input
+                      type={showConfirmBankAcc ? 'text' : 'password'}
+                      name="confirmAccountNumber"
+                      value={bankForm.confirmAccountNumber}
+                      onChange={handleBankChange}
+                      required
+                      className="w-full px-3.5 py-2.5 pr-10 border border-slate-300 rounded-xl focus:ring-2 focus:ring-blue-500 focus:outline-none font-mono text-xs"
+                      placeholder="Re-enter account number"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowConfirmBankAcc(!showConfirmBankAcc)}
+                      className="absolute right-2.5 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 focus:outline-none cursor-pointer"
+                      title={showConfirmBankAcc ? 'Hide confirm account number' : 'Show confirm account number'}
+                    >
+                      {showConfirmBankAcc ? <EyeOff className="w-3.5 h-3.5" /> : <Eye className="w-3.5 h-3.5 text-slate-500" />}
+                    </button>
+                  </div>
                 </div>
               </div>
 

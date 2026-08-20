@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import {
   ArrowRight,
   X,
@@ -6,455 +6,689 @@ import {
   Search,
   CheckCircle2,
   ShieldCheck,
-  ChevronRight
+  Zap,
+  Info,
+  ChevronDown,
+  ChevronUp,
+  Percent,
+  Calendar,
+  CreditCard,
+  Building2,
+  GraduationCap,
+  Car,
+  Home,
+  HeartPulse,
+  SunMedium
 } from 'lucide-react';
 
-const CompactLoanOptions = ({ onApplyClick }) => {
-  const [selectedOption, setSelectedOption] = useState(null);
+const CompactLoanOptions = ({ onApplyClick, application, user }) => {
+  const [selectedLoan, setSelectedLoan] = useState(null);
   const [activeCategory, setActiveCategory] = useState('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [showAll, setShowAll] = useState(false);
 
-  const options = [
+  // Complete, clean, visually self-explanatory loan categories
+  const allLoanTypes = [
     {
       id: 'personal',
       title: 'Personal Loan',
-      tagline: 'Flexible funds for everyday personal & emergency needs',
-      icon: '💰',
-      badge: 'Multi-Purpose',
+      intentQuestion: 'Need funds for personal or family expenses?',
+      illustration: '💰',
       category: 'personal',
-      maxAmount: '₹10,00,000',
-      tenure: '3 – 60 Months',
-      interestRate: 'From 10.49% p.a.',
-      whoItsFor: 'Salaried or self-employed individuals needing flexible unsecured funds.',
-      useCases: 'Home renovation, debt consolidation, family events, or major purchases.',
-      considerations: 'Tenure ranges from 3 to 60 months with reducing balance interest calculations.'
+      accentColor: 'from-blue-600/15 via-indigo-500/10 to-transparent',
+      borderColor: 'border-blue-200/80 hover:border-blue-500',
+      tagColor: 'bg-blue-50 text-blue-700 border-blue-200',
+      defaultBadge: 'Most Popular',
+      useCases: [
+        { label: 'Emergency Cash', icon: '🚨' },
+        { label: 'Medical', icon: '🏥' },
+        { label: 'Travel', icon: '✈️' },
+        { label: 'Family Needs', icon: '👨‍👩‍👧' }
+      ],
+      details: {
+        summary: 'Instant multi-purpose cash with zero security and 10-minute digital approval.',
+        amountRange: '₹25,000 – ₹10,00,000',
+        tenureRange: '3 – 60 Months',
+        interestRate: 'From 10.49% p.a.',
+        sampleEmi: '₹2,148 / mo per ₹1 Lakh',
+        eligibility: [
+          'Age: 21 to 58 years',
+          'Min. Monthly Income: ₹15,000',
+          'Salaried or Self-Employed'
+        ]
+      }
     },
     {
-      id: 'medical',
-      title: 'Medical & Health Loan',
-      tagline: 'Healthcare funding for treatments, surgeries & emergencies',
-      icon: '🚑',
-      badge: 'Healthcare',
-      category: 'urgent',
-      maxAmount: '₹7,50,000',
-      tenure: '6 – 36 Months',
-      interestRate: 'From 9.99% p.a.',
-      whoItsFor: 'Individuals facing planned surgeries, hospitalizations, or urgent medical bills.',
-      useCases: 'Hospital stays, elective procedures, dental treatments, and prescriptions.',
-      considerations: 'Fast priority processing to assist with urgent cash flow requirements.'
+      id: 'home',
+      title: 'Home Loan',
+      intentQuestion: 'Buying or building your dream home?',
+      illustration: '🏠',
+      category: 'lifestyle',
+      accentColor: 'from-amber-600/15 via-orange-500/10 to-transparent',
+      borderColor: 'border-amber-200/80 hover:border-amber-500',
+      tagColor: 'bg-amber-50 text-amber-800 border-amber-200',
+      defaultBadge: 'Lowest Rate',
+      useCases: [
+        { label: 'Buy a Home', icon: '🏠' },
+        { label: 'Build House', icon: '🏗️' },
+        { label: 'Renovation', icon: '🎨' }
+      ],
+      details: {
+        summary: 'Low-interest property finance for purchasing new flats, plots, construction or home upgrades.',
+        amountRange: '₹5,00,000 – ₹50,00,000',
+        tenureRange: '12 – 240 Months',
+        interestRate: 'From 8.50% p.a.',
+        sampleEmi: '₹868 / mo per ₹1 Lakh (20 Yrs)',
+        eligibility: [
+          'Age: 21 to 65 years',
+          'Indian Resident with clear property title',
+          'Salaried or Business owner'
+        ]
+      }
+    },
+    {
+      id: 'vehicle',
+      title: 'Vehicle Loan',
+      intentQuestion: 'Planning your next car or two-wheeler?',
+      illustration: '🚗',
+      category: 'lifestyle',
+      accentColor: 'from-emerald-600/15 via-teal-500/10 to-transparent',
+      borderColor: 'border-emerald-200/80 hover:border-emerald-500',
+      tagColor: 'bg-emerald-50 text-emerald-800 border-emerald-200',
+      defaultBadge: 'Fast Disbursal',
+      useCases: [
+        { label: 'Buy New Car', icon: '🚗' },
+        { label: 'Used Car', icon: '🚙' },
+        { label: 'Two-Wheeler', icon: '🛵' },
+        { label: 'Electric EV', icon: '⚡' }
+      ],
+      details: {
+        summary: 'Drive home your vehicle with up to 100% on-road funding, instant RC check and EV rebates.',
+        amountRange: '₹50,00,00 – ₹15,00,000',
+        tenureRange: '12 – 60 Months',
+        interestRate: 'From 8.99% p.a.',
+        sampleEmi: '₹2,075 / mo per ₹1 Lakh',
+        eligibility: [
+          'Age: 18 to 60 years',
+          'Valid Driving License / ID',
+          'Salaried or Self-employed'
+        ]
+      }
     },
     {
       id: 'education',
-      title: 'Education & Upskilling',
-      tagline: 'Invest in college tuition fees, certifications & bootcamps',
-      icon: '🎓',
-      badge: 'Academics',
+      title: 'Education Loan',
+      intentQuestion: 'Funding college or career upskilling?',
+      illustration: '🎓',
       category: 'career',
-      maxAmount: '₹15,00,000',
-      tenure: '12 – 84 Months',
-      interestRate: 'From 9.50% p.a.',
-      whoItsFor: 'Students and working professionals seeking career upskilling or degree courses.',
-      useCases: 'Tuition fees, certification programs, textbooks, tech bootcamps, and hostel costs.',
-      considerations: 'Structured monthly installments aligned with academic timelines and moratorium options.'
+      accentColor: 'from-indigo-600/15 via-blue-500/10 to-transparent',
+      borderColor: 'border-indigo-200/80 hover:border-indigo-500',
+      tagColor: 'bg-indigo-50 text-indigo-700 border-indigo-200',
+      defaultBadge: 'Career Boost',
+      useCases: [
+        { label: 'College Fees', icon: '🎓' },
+        { label: 'Higher Studies', icon: '📚' },
+        { label: 'Study Abroad', icon: '✈️' },
+        { label: 'Tech Bootcamp', icon: '💻' }
+      ],
+      details: {
+        summary: 'Comprehensive academic credit covering college tuition fees, books, living expenses, and overseas courses.',
+        amountRange: '₹1,00,000 – ₹20,00,000',
+        tenureRange: '12 – 84 Months',
+        interestRate: 'From 9.25% p.a.',
+        sampleEmi: '₹1,625 / mo per ₹1 Lakh (7 Yrs)',
+        eligibility: [
+          'Confirmed admission in recognized institution',
+          'Student with Co-borrower (Parent/Guardian)',
+          'No collateral up to ₹7.5 Lakhs'
+        ]
+      }
     },
     {
       id: 'business',
-      title: 'Business & MSME Credit',
-      tagline: 'Working capital, inventory & equipment for enterprises',
-      icon: '💼',
-      badge: 'Commercial',
+      title: 'Business Loan',
+      intentQuestion: 'Growing or expanding your enterprise?',
+      illustration: '🏢',
       category: 'business',
-      maxAmount: '₹20,00,000',
-      tenure: '6 – 48 Months',
-      interestRate: 'From 11.25% p.a.',
-      whoItsFor: 'Small business owners, traders, consultants, and independent proprietors.',
-      useCases: 'Inventory purchase, supplier payments, equipment leases, and cash flow bridge.',
-      considerations: 'Minimal documentation based on monthly cash inflows and GST returns.'
+      accentColor: 'from-violet-600/15 via-purple-500/10 to-transparent',
+      borderColor: 'border-violet-200/80 hover:border-violet-500',
+      tagColor: 'bg-violet-50 text-violet-700 border-violet-200',
+      defaultBadge: 'High Limit',
+      useCases: [
+        { label: 'Start Business', icon: '🏢' },
+        { label: 'Expand Store', icon: '📈' },
+        { label: 'Working Capital', icon: '📦' },
+        { label: 'Machinery', icon: '⚙️' }
+      ],
+      details: {
+        summary: 'Unsecured business funding based on GST cashflows and banking history with rapid disbursal.',
+        amountRange: '₹1,00,000 – ₹25,00,000',
+        tenureRange: '6 – 48 Months',
+        interestRate: 'From 11.25% p.a.',
+        sampleEmi: '₹2,600 / mo per ₹1 Lakh',
+        eligibility: [
+          'Min. 1 year business operation',
+          'Bank statement with steady cashflow',
+          'Zero collateral required'
+        ]
+      }
     },
     {
-      id: 'two_wheeler_ev',
-      title: 'Two-Wheeler & EV Loan',
-      tagline: 'Drive your dream electric scooter, bike, or EV vehicle',
-      icon: '⚡',
-      badge: 'Mobility',
+      id: 'solar',
+      title: 'Solar & Clean Energy',
+      intentQuestion: 'Switching to clean rooftop solar power?',
+      illustration: '☀️',
       category: 'green',
-      maxAmount: '₹3,00,000',
-      tenure: '12 – 48 Months',
-      interestRate: 'From 8.99% p.a.',
-      whoItsFor: 'Commuters and delivery professionals purchasing bikes, scooters, or green EVs.',
-      useCases: 'Electric scooter downpayment, two-wheeler purchases, and battery financing.',
-      considerations: 'Special green interest subsidy available for certified EV models.'
+      accentColor: 'from-lime-600/15 via-emerald-500/10 to-transparent',
+      borderColor: 'border-lime-200/80 hover:border-lime-500',
+      tagColor: 'bg-lime-50 text-lime-800 border-lime-200',
+      defaultBadge: 'PM Subsidy',
+      useCases: [
+        { label: 'Rooftop Solar', icon: '☀️' },
+        { label: 'Govt Subsidy', icon: '🏛️' },
+        { label: 'Battery Backup', icon: '🔋' }
+      ],
+      details: {
+        summary: 'Special low-rate financing for residential rooftop solar panels and PM Surya Ghar subsidies.',
+        amountRange: '₹50,000 – ₹6,00,000',
+        tenureRange: '12 – 60 Months',
+        interestRate: 'From 8.50% p.a.',
+        sampleEmi: '₹2,051 / mo per ₹1 Lakh',
+        eligibility: [
+          'Residential homeowner or villa owner',
+          'Electricity bill in applicant name',
+          'Direct subsidy credited to bank'
+        ]
+      }
     },
     {
-      id: 'home_renovation',
-      title: 'Home Renovation & Decor',
-      tagline: 'Upgrade interiors, modular kitchen & smart home fixtures',
-      icon: '🏡',
-      badge: 'Property',
-      category: 'lifestyle',
-      maxAmount: '₹12,00,000',
-      tenure: '12 – 60 Months',
-      interestRate: 'From 10.25% p.a.',
-      whoItsFor: 'Homeowners and tenants upgrading living spaces or handling structural maintenance.',
-      useCases: 'Modular kitchen, painting, solar panel installation, and furniture upgrades.',
-      considerations: 'Attractive low rates for collateral-free home upgrade funding.'
-    },
-    {
-      id: 'debt_consolidation',
-      title: 'Debt Consolidation',
-      tagline: 'Combine multiple loans & credit cards into one low EMI',
-      icon: '📊',
-      badge: 'Smart Finance',
-      category: 'personal',
-      maxAmount: '₹10,00,000',
-      tenure: '12 – 60 Months',
-      interestRate: 'From 10.99% p.a.',
-      whoItsFor: 'Individuals with multiple credit card bills or micro-loans looking to save interest.',
-      useCases: 'Paying off credit cards, clearing high-cost informal debt, and boosting credit score.',
-      considerations: 'Lowers total monthly outflow with a single predictable payment date.'
-    },
-    {
-      id: 'travel',
-      title: 'Travel & Vacation Loan',
-      tagline: 'Fund your dream holidays, flights & international trips',
-      icon: '✈️',
-      badge: 'Lifestyle',
-      category: 'lifestyle',
-      maxAmount: '₹5,00,000',
-      tenure: '3 – 24 Months',
-      interestRate: 'From 11.50% p.a.',
-      whoItsFor: 'Travelers planning domestic holidays, international vacations, or family trips.',
-      useCases: 'Flight tickets, hotel reservations, tour packages, visa fees, and travel gear.',
-      considerations: 'Fixed monthly EMIs to help you budget travel without liquidating emergency savings.'
+      id: 'medical',
+      title: 'Medical & Healthcare Loan',
+      intentQuestion: 'Urgent hospital bills or planned surgery?',
+      illustration: '🏥',
+      category: 'urgent',
+      accentColor: 'from-rose-600/15 via-pink-500/10 to-transparent',
+      borderColor: 'border-rose-200/80 hover:border-rose-500',
+      tagColor: 'bg-rose-50 text-rose-700 border-rose-200',
+      defaultBadge: 'Zero Delay',
+      useCases: [
+        { label: 'Surgeries', icon: '🏥' },
+        { label: 'Hospitalization', icon: '🩺' },
+        { label: 'Medications', icon: '💊' },
+        { label: 'Dental / Eye', icon: '👁️' }
+      ],
+      details: {
+        summary: 'Priority express healthcare credit disbursed directly to ensure medical care proceeds without worry.',
+        amountRange: '₹25,000 – ₹7,50,000',
+        tenureRange: '6 – 36 Months',
+        interestRate: 'From 9.99% p.a.',
+        sampleEmi: '₹3,226 / mo per ₹1 Lakh',
+        eligibility: [
+          'Age: 21 to 60 years',
+          'Medical estimation or hospital bill',
+          'Immediate same-day disbursal'
+        ]
+      }
     },
     {
       id: 'wedding',
-      title: 'Wedding & Celebration',
-      tagline: 'Complete financing for venues, catering, jewelry & outfits',
-      icon: '💍',
-      badge: 'Celebrations',
+      title: 'Wedding & Celebration Loan',
+      intentQuestion: 'Planning a grand wedding or family event?',
+      illustration: '💍',
       category: 'lifestyle',
-      maxAmount: '₹15,00,000',
-      tenure: '12 – 48 Months',
-      interestRate: 'From 10.75% p.a.',
-      whoItsFor: 'Couples and families planning wedding ceremonies, receptions, or milestone anniversaries.',
-      useCases: 'Venue booking, photography, bridal wear, jewelry purchases, and catering.',
-      considerations: 'Staged disbursals available to pay vendors across various event milestones.'
+      accentColor: 'from-pink-600/15 via-rose-500/10 to-transparent',
+      borderColor: 'border-pink-200/80 hover:border-pink-500',
+      tagColor: 'bg-pink-50 text-pink-700 border-pink-200',
+      defaultBadge: 'Milestone Events',
+      useCases: [
+        { label: 'Banquet Venue', icon: '🏰' },
+        { label: 'Jewelry', icon: '✨' },
+        { label: 'Catering', icon: '🍽️' },
+        { label: 'Photography', icon: '📸' }
+      ],
+      details: {
+        summary: 'Complete financial backing for wedding ceremonies, banquet halls, bridal jewelry, and milestone events.',
+        amountRange: '₹1,00,000 – ₹15,00,000',
+        tenureRange: '12 – 48 Months',
+        interestRate: 'From 10.75% p.a.',
+        sampleEmi: '₹2,572 / mo per ₹1 Lakh',
+        eligibility: [
+          'Salaried or Self-employed individuals',
+          'Comfortable flexible repayment installments',
+          'Staged disbursals across vendor milestones'
+        ]
+      }
     },
     {
       id: 'gadgets',
       title: 'Consumer Tech & Gadgets',
-      tagline: 'Instant credit for laptops, smartphones & workstations',
-      icon: '💻',
-      badge: 'Tech & Home',
+      intentQuestion: 'Upgrading your laptop, phone or workstation?',
+      illustration: '💻',
       category: 'personal',
-      maxAmount: '₹2,50,000',
-      tenure: '3 – 18 Months',
-      interestRate: 'From 9.99% p.a.',
-      whoItsFor: 'Tech enthusiasts, creators, remote workers, and students upgrading hardware.',
-      useCases: 'Flagship smartphones, editing laptops, graphic tablets, and smart TVs.',
-      considerations: 'Zero-cost EMI promotions available with participating partner merchants.'
+      accentColor: 'from-cyan-600/15 via-blue-500/10 to-transparent',
+      borderColor: 'border-cyan-200/80 hover:border-cyan-500',
+      tagColor: 'bg-cyan-50 text-cyan-700 border-cyan-200',
+      defaultBadge: 'Instant Token',
+      useCases: [
+        { label: 'MacBook & Laptop', icon: '💻' },
+        { label: 'Smartphones', icon: '📱' },
+        { label: 'Camera Gear', icon: '📷' },
+        { label: 'Smart TV', icon: '📺' }
+      ],
+      details: {
+        summary: 'Instant micro-credit vouchers for premium laptops, gaming rigs, iPhones, and content creation gear.',
+        amountRange: '₹15,000 – ₹2,50,000',
+        tenureRange: '3 – 18 Months',
+        interestRate: 'From 9.99% p.a.',
+        sampleEmi: '₹5,900 / mo per ₹1 Lakh (18 Mos)',
+        eligibility: [
+          'PAN & Aadhaar online KYC',
+          'Zero-cost EMI schemes with partner merchants',
+          'Digital token ready in 5 mins'
+        ]
+      }
     },
     {
-      id: 'solar',
-      title: 'Solar & Green Energy',
-      tagline: 'Residential rooftop solar panels & eco energy setups',
-      icon: '☀️',
-      badge: 'Eco Friendly',
-      category: 'green',
-      maxAmount: '₹6,00,000',
-      tenure: '12 – 60 Months',
-      interestRate: 'From 8.50% p.a.',
-      whoItsFor: 'Homeowners and housing societies seeking to reduce power bills and go green.',
-      useCases: 'Rooftop solar panel installation, inverters, smart net meters, and battery backup.',
-      considerations: 'Eligible for central/state government rooftop solar subsidy schemes.'
+      id: 'debt_consolidation',
+      title: 'Debt Consolidation Loan',
+      intentQuestion: 'Combine multiple credit cards & loans into 1 EMI?',
+      illustration: '📊',
+      category: 'personal',
+      accentColor: 'from-purple-600/15 via-indigo-500/10 to-transparent',
+      borderColor: 'border-purple-200/80 hover:border-purple-500',
+      tagColor: 'bg-purple-50 text-purple-700 border-purple-200',
+      defaultBadge: 'Save Interest',
+      useCases: [
+        { label: 'Clear Card Dues', icon: '💳' },
+        { label: 'Lower Monthly EMI', icon: '📉' },
+        { label: 'Single Due Date', icon: '📅' },
+        { label: 'Boost CIBIL Score', icon: '📈' }
+      ],
+      details: {
+        summary: 'Consolidate multiple high-interest credit cards and micro-loans into a single manageable low-interest payment.',
+        amountRange: '₹50,000 – ₹10,00,000',
+        tenureRange: '12 – 60 Months',
+        interestRate: 'From 10.99% p.a.',
+        sampleEmi: '₹2,174 / mo per ₹1 Lakh',
+        eligibility: [
+          'Regular verifiable income source',
+          'Reduces total monthly outflow significantly',
+          'Instant payoff directly to outstanding lenders'
+        ]
+      }
     },
     {
       id: 'women_entrepreneur',
       title: 'Women Entrepreneur Loan',
-      tagline: 'Dedicated funding & subsidized rates for women-led startups',
-      icon: '👩‍💼',
-      badge: 'Empowerment',
+      intentQuestion: 'Subsidized business funding for women founders?',
+      illustration: '👩‍💼',
       category: 'business',
-      maxAmount: '₹10,00,000',
-      tenure: '12 – 60 Months',
-      interestRate: 'From 9.25% p.a.',
-      whoItsFor: 'Women founders, boutique owners, artisans, and women-led MSME enterprises.',
-      useCases: 'Shop setup, raw material procurement, team expansion, and digital marketing.',
-      considerations: 'Special 0.50% interest rate rebate on prompt monthly EMI repayments.'
-    },
-    {
-      id: 'agri_tech',
-      title: 'Agri-Tech & Farm Equipment',
-      tagline: 'Micro-irrigation, solar pumps & modern farming tools',
-      icon: '🚜',
-      badge: 'Agriculture',
-      category: 'business',
-      maxAmount: '₹8,00,000',
-      tenure: '12 – 48 Months',
-      interestRate: 'From 9.75% p.a.',
-      whoItsFor: 'Progressive farmers, agribusiness operators, and rural agro-service providers.',
-      useCases: 'Drip irrigation kits, tractor attachments, greenhouse setups, and seed storage.',
-      considerations: 'Flexible seasonal repayment cycles matched to harvest revenue periods.'
-    },
-    {
-      id: 'freelancer',
-      title: 'Gig & Freelancer Credit',
-      tagline: 'Cash flow bridge based on bank statement & invoice history',
-      icon: '🎨',
-      badge: 'Gig Economy',
-      category: 'career',
-      maxAmount: '₹4,00,000',
-      tenure: '3 – 24 Months',
-      interestRate: 'From 11.99% p.a.',
-      whoItsFor: 'Independent consultants, freelance designers, developers, and content creators.',
-      useCases: 'Smoothing irregular income, client payment delays, software subscriptions, and tools.',
-      considerations: 'No ITR mandatory — approved via UPI transaction flows and banking analytics.'
-    },
-    {
-      id: 'used_car',
-      title: 'Used Car & Pre-Owned Vehicle',
-      tagline: 'Certified second-hand cars & transfer financing',
-      icon: '🚗',
-      badge: 'Automobile',
-      category: 'lifestyle',
-      maxAmount: '₹8,00,000',
-      tenure: '12 – 60 Months',
-      interestRate: 'From 10.50% p.a.',
-      whoItsFor: 'Families and commuters upgrading to four-wheeler personal mobility.',
-      useCases: 'Certified pre-owned sedans, hatchbacks, SUVs, RC transfers, and insurance.',
-      considerations: 'Financing available up to 85% of certified vehicle valuation.'
+      accentColor: 'from-fuchsia-600/15 via-pink-500/10 to-transparent',
+      borderColor: 'border-fuchsia-200/80 hover:border-fuchsia-500',
+      tagColor: 'bg-fuchsia-50 text-fuchsia-700 border-fuchsia-200',
+      defaultBadge: '0.5% Rebate',
+      useCases: [
+        { label: 'Boutique & Retail', icon: '🛍️' },
+        { label: 'Working Capital', icon: '💼' },
+        { label: 'Artisans & Crafts', icon: '🎨' },
+        { label: 'Hiring Staff', icon: '👥' }
+      ],
+      details: {
+        summary: 'Special low-rate credit line and dedicated financial guidance exclusively for women-led startups and MSMEs.',
+        amountRange: '₹50,000 – ₹10,00,000',
+        tenureRange: '12 – 60 Months',
+        interestRate: 'From 9.25% p.a.',
+        sampleEmi: '₹2,088 / mo per ₹1 Lakh',
+        eligibility: [
+          'Women founder / proprietor / partner',
+          'Special 0.50% interest rate rebate on on-time payments',
+          'Minimal documentation requirements'
+        ]
+      }
     },
     {
       id: 'rental_deposit',
       title: 'Rental Deposit & Relocation',
-      tagline: 'Security deposit for new apartments, packing & moving',
-      icon: '🛋️',
-      badge: 'Relocation',
+      intentQuestion: 'Need security deposit or movers funding?',
+      illustration: '🛋️',
       category: 'urgent',
-      maxAmount: '₹3,50,000',
-      tenure: '6 – 24 Months',
-      interestRate: 'From 10.99% p.a.',
-      whoItsFor: 'Professionals moving to new cities or renting new residential homes.',
-      useCases: 'Heavy landlord security deposits, brokerage fees, movers & packers bills.',
-      considerations: 'Disbursed directly within 24 hours to secure property agreements without delays.'
+      accentColor: 'from-orange-600/15 via-amber-500/10 to-transparent',
+      borderColor: 'border-orange-200/80 hover:border-orange-500',
+      tagColor: 'bg-orange-50 text-orange-700 border-orange-200',
+      defaultBadge: 'Same Day',
+      useCases: [
+        { label: 'Rental Deposit', icon: '🏢' },
+        { label: 'Movers & Packers', icon: '🚚' },
+        { label: 'Brokerage Fees', icon: '🤝' },
+        { label: 'New Furniture', icon: '🛋️' }
+      ],
+      details: {
+        summary: 'Instant liquidity for heavy landlord rental deposits and moving costs, disbursed within 12 hours.',
+        amountRange: '₹30,000 – ₹3,50,000',
+        tenureRange: '6 – 24 Months',
+        interestRate: 'From 10.99% p.a.',
+        sampleEmi: '₹4,660 / mo per ₹1 Lakh',
+        eligibility: [
+          'Valid tenancy agreement or relocation letter',
+          'Direct disbursal to secure home agreements',
+          'Zero foreclosure charges'
+        ]
+      }
     }
   ];
 
   const categories = [
-    { id: 'all', label: 'All Options', count: options.length },
-    { id: 'personal', label: 'Personal & Lifestyle', count: options.filter(o => o.category === 'personal' || o.category === 'lifestyle').length },
-    { id: 'urgent', label: 'Healthcare & Urgent', count: options.filter(o => o.category === 'urgent').length },
-    { id: 'business', label: 'Business & MSME', count: options.filter(o => o.category === 'business').length },
-    { id: 'career', label: 'Education & Career', count: options.filter(o => o.category === 'career').length },
-    { id: 'green', label: 'EV & Green Energy', count: options.filter(o => o.category === 'green').length },
+    { id: 'all', label: 'All 12 Options' },
+    { id: 'personal', label: 'Personal & Lifestyle' },
+    { id: 'urgent', label: 'Medical & Urgent' },
+    { id: 'business', label: 'Business & MSME' },
+    { id: 'career', label: 'Education & Career' },
+    { id: 'green', label: 'EV & Solar Energy' }
   ];
 
-  const filteredOptions = options.filter(opt => {
-    const matchesCategory = 
-      activeCategory === 'all' ? true :
-      activeCategory === 'personal' ? (opt.category === 'personal' || opt.category === 'lifestyle') :
-      opt.category === activeCategory;
+  // Recommendation matching
+  const recommendedLoanId = useMemo(() => {
+    const existingType = (application?.loanType || '').toLowerCase();
+    if (existingType.includes('home') || existingType.includes('renovat')) return 'home';
+    if (existingType.includes('vehicle') || existingType.includes('car') || existingType.includes('wheeler')) return 'vehicle';
+    if (existingType.includes('education') || existingType.includes('study')) return 'education';
+    if (existingType.includes('business') || existingType.includes('msme')) return 'business';
+    if (existingType.includes('solar') || existingType.includes('green')) return 'solar';
+    if (existingType.includes('medical') || existingType.includes('health')) return 'medical';
+    if (existingType.includes('wedding')) return 'wedding';
+    if (existingType.includes('personal')) return 'personal';
 
-    const matchesSearch = 
-      opt.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      opt.tagline.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      opt.badge.toLowerCase().includes(searchQuery.toLowerCase());
+    if (application?.employmentType === 'BUSINESS' || application?.employmentType === 'SELF_EMPLOYED') return 'business';
 
-    return matchesCategory && matchesSearch;
-  });
+    return 'personal';
+  }, [application]);
+
+  // Filtered loan list
+  const filteredLoans = useMemo(() => {
+    let list = allLoanTypes;
+
+    if (activeCategory !== 'all') {
+      list = list.filter((loan) => {
+        if (activeCategory === 'personal') return loan.category === 'personal' || loan.category === 'lifestyle';
+        return loan.category === activeCategory;
+      });
+    }
+
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase().trim();
+      list = list.filter((loan) =>
+        loan.title.toLowerCase().includes(q) ||
+        loan.intentQuestion.toLowerCase().includes(q) ||
+        loan.useCases.some((u) => u.label.toLowerCase().includes(q))
+      );
+    } else if (!showAll && activeCategory === 'all') {
+      // By default show top 6 featured loans
+      list = list.slice(0, 6);
+    }
+
+    return list;
+  }, [activeCategory, searchQuery, showAll]);
 
   return (
-    <div id="loan-options-section" className="space-y-5">
-      {/* Header & Controls */}
-      <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-slate-200 pb-4">
-        <div>
-          <div className="inline-flex items-center gap-1.5 px-3 py-1 rounded-full bg-blue-50 text-blue-700 text-xs font-bold border border-blue-200 mb-2">
-            <Sparkles className="w-3.5 h-3.5" /> Comprehensive Financing
+    <section id="loan-options-section" className="space-y-6">
+      {/* ── SECTION HEADER & SEARCH ── */}
+      <div className="bg-white rounded-3xl p-6 sm:p-7 border border-slate-200/90 shadow-xs space-y-5">
+        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-5">
+          <div className="space-y-1">
+            <span className="text-xs font-extrabold uppercase tracking-wider text-blue-600 flex items-center gap-1.5 mb-1">
+              <Sparkles className="w-3.5 h-3.5" /> Find the loan that fits your need
+            </span>
+            <h2 className="text-2xl sm:text-3xl font-black text-slate-900 tracking-tight">
+              What are you planning?
+            </h2>
+            <p className="text-xs sm:text-sm text-slate-500">
+              Select your goal to view matching loan terms with zero paperwork and instant approval.
+            </p>
           </div>
-          <h2 className="font-black text-slate-900 text-2xl tracking-tight">
-            Explore All 16 Loan Options
-          </h2>
-          <p className="text-xs sm:text-sm text-slate-500 mt-0.5 max-w-xl">
-            Choose from tailored digital loan facilities designed for your specific financial journey with transparent rates and fast paperless disbursal.
-          </p>
+
+          {/* Quick Search */}
+          <div className="relative w-full lg:w-72">
+            <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
+            <input
+              type="text"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              placeholder="Search by goal (e.g. laptop, car, wedding)..."
+              className="w-full pl-9.5 pr-8 py-2.5 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 rounded-xl text-xs font-medium focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all"
+            />
+            {searchQuery && (
+              <button
+                onClick={() => setSearchQuery('')}
+                className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-700 text-xs font-bold cursor-pointer"
+              >
+                ✕
+              </button>
+            )}
+          </div>
         </div>
 
-        {/* Search Input */}
-        <div className="relative w-full md:w-72">
-          <Search className="w-4 h-4 text-slate-400 absolute left-3.5 top-1/2 -translate-y-1/2" />
-          <input
-            type="text"
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            placeholder="Search by loan type or goal..."
-            className="w-full pl-9.5 pr-4 py-2 bg-white border border-slate-200 rounded-xl text-xs focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-500 transition-all shadow-2xs"
-          />
-          {searchQuery && (
-            <button
-              onClick={() => setSearchQuery('')}
-              className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 text-xs"
-            >
-              ✕
-            </button>
-          )}
+        {/* Category Pills Bar */}
+        <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar pt-2 border-t border-slate-100">
+          {categories.map((cat) => {
+            const isActive = activeCategory === cat.id;
+            return (
+              <button
+                key={cat.id}
+                type="button"
+                onClick={() => {
+                  setActiveCategory(cat.id);
+                  setShowAll(true);
+                }}
+                className={`px-3.5 py-1.5 rounded-xl text-xs font-bold transition-all whitespace-nowrap cursor-pointer ${
+                  isActive
+                    ? 'bg-blue-600 text-white shadow-xs'
+                    : 'bg-slate-100 text-slate-600 hover:bg-slate-200 hover:text-slate-900'
+                }`}
+              >
+                {cat.label}
+              </button>
+            );
+          })}
         </div>
       </div>
 
-      {/* Category Tabs */}
-      <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar text-xs">
-        {categories.map((cat) => {
-          const isActive = activeCategory === cat.id;
-          return (
-            <button
-              key={cat.id}
-              type="button"
-              onClick={() => setActiveCategory(cat.id)}
-              className={`px-3.5 py-1.5 rounded-xl font-bold transition-all whitespace-nowrap flex items-center gap-1.5 cursor-pointer text-xs ${
-                isActive
-                  ? 'bg-blue-600 text-white shadow-sm shadow-blue-600/20'
-                  : 'bg-white text-slate-600 border border-slate-200 hover:bg-slate-50 hover:text-slate-900'
-              }`}
-            >
-              <span>{cat.label}</span>
-              <span className={`text-[10px] px-1.5 py-0.2 rounded-full ${isActive ? 'bg-white/20 text-white' : 'bg-slate-100 text-slate-500'}`}>
-                {cat.count}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      {/* Cards Grid */}
-      {filteredOptions.length === 0 ? (
-        <div className="bg-white rounded-2xl p-8 text-center border border-slate-200 space-y-2">
+      {/* ── VISUALLY SELF-EXPLANATORY CARDS GRID ── */}
+      {filteredLoans.length === 0 ? (
+        <div className="bg-white rounded-3xl p-10 text-center border border-slate-200 space-y-2">
           <p className="text-sm font-bold text-slate-700">No loan options matched "{searchQuery}"</p>
-          <p className="text-xs text-slate-400">Try searching for keywords like medical, business, wedding, or car</p>
+          <p className="text-xs text-slate-400">Try searching for keywords like home, medical, laptop, or car</p>
           <button
             onClick={() => { setSearchQuery(''); setActiveCategory('all'); }}
-            className="text-xs text-blue-600 font-bold hover:underline pt-2 inline-block"
+            className="text-xs font-bold text-blue-600 hover:underline pt-1 inline-block cursor-pointer"
           >
             Clear Filters
           </button>
         </div>
       ) : (
-        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3.5">
-          {filteredOptions.map((opt) => (
-            <div
-              key={opt.id}
-              className="bg-white rounded-2xl p-5 border border-slate-200 shadow-2xs hover:shadow-md hover:border-blue-300 transition-all flex flex-col justify-between space-y-3 group"
-            >
-              <div className="space-y-2.5">
-                <div className="flex items-center justify-between">
-                  <span className="text-2xl">{opt.icon}</span>
-                  <span className="text-[10px] font-bold px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 border border-slate-200">
-                    {opt.badge}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4 sm:gap-6">
+          {filteredLoans.map((loan) => {
+            const isRecommended = loan.id === recommendedLoanId;
+
+            return (
+              <div
+                key={loan.id}
+                onClick={() => setSelectedLoan(loan)}
+                className={`group relative bg-white rounded-3xl p-6 border-2 transition-all duration-300 flex flex-col justify-between cursor-pointer hover:shadow-xl hover:-translate-y-1 ${
+                  isRecommended
+                    ? 'border-blue-500 shadow-md ring-2 ring-blue-500/20'
+                    : `${loan.borderColor} shadow-xs`
+                }`}
+              >
+                {/* Subtle top gradient aura */}
+                <div className={`absolute inset-x-0 top-0 h-28 rounded-t-3xl bg-gradient-to-b ${loan.accentColor} pointer-events-none`} />
+
+                <div className="relative z-10 space-y-4">
+                  {/* Top Row: Large Visual Illustration & Badge */}
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="text-4xl sm:text-5xl select-none group-hover:scale-110 transition-transform duration-300">
+                      {loan.illustration}
+                    </div>
+
+                    {isRecommended ? (
+                      <span className="inline-flex items-center gap-1 px-3 py-1 rounded-full text-[11px] font-extrabold bg-blue-600 text-white shadow-xs">
+                        <Sparkles className="w-3 h-3" /> Recommended
+                      </span>
+                    ) : (
+                      <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border ${loan.tagColor}`}>
+                        {loan.defaultBadge}
+                      </span>
+                    )}
+                  </div>
+
+                  {/* Title & Short Intent Question */}
+                  <div className="space-y-1">
+                    <h3 className="text-xl font-black text-slate-900 tracking-tight group-hover:text-blue-600 transition-colors">
+                      {loan.title}
+                    </h3>
+                    <p className="text-xs font-semibold text-slate-500 leading-snug">
+                      {loan.intentQuestion}
+                    </p>
+                  </div>
+
+                  {/* 2-4 Small Visual Use-Case Chips */}
+                  <div className="pt-1 flex flex-wrap gap-1.5">
+                    {loan.useCases.map((chip, idx) => (
+                      <span
+                        key={idx}
+                        className="inline-flex items-center gap-1 px-2.5 py-1 rounded-xl text-xs font-bold bg-slate-100 text-slate-700 border border-slate-200/80 group-hover:bg-white group-hover:border-slate-300 transition-colors"
+                      >
+                        <span className="text-xs">{chip.icon}</span>
+                        <span>{chip.label}</span>
+                      </span>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Bottom CTA Row */}
+                <div className="relative z-10 pt-5 mt-4 border-t border-slate-100 flex items-center justify-between">
+                  <span className="text-xs font-extrabold text-slate-600 group-hover:text-blue-600 transition-colors">
+                    {loan.details.interestRate}
                   </span>
-                </div>
 
-                <div>
-                  <h3 className="font-bold text-slate-900 text-sm group-hover:text-blue-600 transition-colors">
-                    {opt.title}
-                  </h3>
-                  <p className="text-xs text-slate-500 mt-0.5 leading-relaxed line-clamp-2">
-                    {opt.tagline}
-                  </p>
-                </div>
-
-                <div className="grid grid-cols-2 gap-1.5 pt-2 border-t border-slate-100 text-[11px]">
-                  <div className="bg-slate-50 p-1.5 rounded-lg border border-slate-100">
-                    <span className="text-slate-400 block text-[9px] uppercase font-bold">Max Limit</span>
-                    <span className="font-black text-slate-800 font-mono">{opt.maxAmount}</span>
-                  </div>
-                  <div className="bg-slate-50 p-1.5 rounded-lg border border-slate-100">
-                    <span className="text-slate-400 block text-[9px] uppercase font-bold">Tenure</span>
-                    <span className="font-bold text-slate-800">{opt.tenure}</span>
+                  <div className="inline-flex items-center gap-1.5 text-xs font-black text-blue-600 group-hover:translate-x-1 transition-transform">
+                    Explore <ArrowRight className="w-4 h-4" />
                   </div>
                 </div>
               </div>
-
-              <div className="pt-2 border-t border-slate-100 flex items-center justify-between gap-2">
-                <button
-                  type="button"
-                  onClick={() => setSelectedOption(opt)}
-                  className="text-xs font-semibold text-slate-500 hover:text-slate-800 transition-colors cursor-pointer"
-                >
-                  Learn more
-                </button>
-
-                <button
-                  type="button"
-                  onClick={() => onApplyClick(opt.title)}
-                  className="text-xs font-bold text-blue-600 hover:text-blue-700 bg-blue-50 hover:bg-blue-100 px-3 py-1.5 rounded-lg transition-colors flex items-center gap-1 cursor-pointer"
-                >
-                  Apply <ArrowRight className="w-3 h-3" />
-                </button>
-              </div>
-            </div>
-          ))}
+            );
+          })}
         </div>
       )}
 
-      {/* Detailed Info Modal */}
-      {selectedOption && (
-        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
-          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 space-y-5 shadow-2xl border border-slate-200">
-            <div className="flex items-start justify-between border-b border-slate-100 pb-3">
-              <div className="flex items-center gap-3">
-                <span className="text-3xl">{selectedOption.icon}</span>
+      {/* ── EXPAND / COLLAPSE ALL 12 PRODUCTS TOGGLE ── */}
+      {!searchQuery && activeCategory === 'all' && (
+        <div className="text-center pt-2">
+          <button
+            type="button"
+            onClick={() => setShowAll(!showAll)}
+            className="inline-flex items-center gap-2 px-6 py-3 rounded-2xl border border-slate-300 bg-white hover:bg-slate-50 text-slate-800 font-black text-xs shadow-xs hover:shadow-md transition-all cursor-pointer"
+          >
+            {showAll ? 'Show Top 6 Featured Loans' : 'Explore All 12 Loan Options'}
+            {showAll ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
+          </button>
+        </div>
+      )}
+
+      {/* ── CLEAN FINTECH DETAIL MODAL (ON CLICK) ── */}
+      {selectedLoan && (
+        <div className="fixed inset-0 z-50 bg-slate-950/60 backdrop-blur-xs flex items-center justify-center p-4 animate-fade-in">
+          <div className="bg-white rounded-3xl max-w-lg w-full p-6 sm:p-7 space-y-6 shadow-2xl border border-slate-200 animate-scale-up max-h-[90vh] overflow-y-auto">
+            {/* Header with Large Illustration */}
+            <div className="flex items-start justify-between border-b border-slate-100 pb-4">
+              <div className="flex items-center gap-3.5">
+                <div className="text-4xl bg-slate-100 p-3 rounded-2xl">
+                  {selectedLoan.illustration}
+                </div>
                 <div>
-                  <span className="text-[10px] font-bold text-slate-400 uppercase tracking-wider block">
-                    {selectedOption.badge}
+                  <span className={`text-[10px] font-extrabold px-2.5 py-0.5 rounded-full border ${selectedLoan.tagColor}`}>
+                    {selectedLoan.title}
                   </span>
-                  <h3 className="text-lg font-black text-slate-900">
-                    {selectedOption.title}
+                  <h3 className="text-xl font-black text-slate-900 mt-1">
+                    {selectedLoan.intentQuestion}
                   </h3>
                 </div>
               </div>
+
               <button
-                onClick={() => setSelectedOption(null)}
-                className="text-slate-400 hover:text-slate-700 p-1 cursor-pointer"
+                onClick={() => setSelectedLoan(null)}
+                className="text-slate-400 hover:text-slate-700 p-1.5 rounded-xl hover:bg-slate-100 cursor-pointer transition-colors"
+                aria-label="Close"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
-            <div className="grid grid-cols-3 gap-2 text-center text-xs">
-              <div className="p-2.5 rounded-xl bg-blue-50 border border-blue-100">
-                <span className="text-[10px] text-blue-600 font-bold uppercase block">Max Amount</span>
-                <span className="font-extrabold text-blue-900 font-mono text-sm">{selectedOption.maxAmount}</span>
-              </div>
-              <div className="p-2.5 rounded-xl bg-emerald-50 border border-emerald-100">
-                <span className="text-[10px] text-emerald-600 font-bold uppercase block">Tenure</span>
-                <span className="font-extrabold text-emerald-900 text-sm">{selectedOption.tenure}</span>
-              </div>
-              <div className="p-2.5 rounded-xl bg-indigo-50 border border-indigo-100">
-                <span className="text-[10px] text-indigo-600 font-bold uppercase block">Interest Rate</span>
-                <span className="font-extrabold text-indigo-900 text-xs">{selectedOption.interestRate}</span>
+            {/* Typical Use-Cases */}
+            <div className="space-y-2">
+              <span className="text-xs font-bold text-slate-400 uppercase tracking-wider block">
+                Typical Use Cases:
+              </span>
+              <div className="flex flex-wrap gap-2">
+                {selectedLoan.useCases.map((chip, idx) => (
+                  <span
+                    key={idx}
+                    className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl text-xs font-bold bg-slate-50 text-slate-800 border border-slate-200"
+                  >
+                    <span>{chip.icon}</span>
+                    <span>{chip.label}</span>
+                  </span>
+                ))}
               </div>
             </div>
 
+            {/* 3 Metric Pills */}
+            <div className="grid grid-cols-3 gap-2.5 text-center">
+              <div className="p-3 rounded-2xl bg-blue-50/80 border border-blue-100">
+                <span className="text-[10px] text-blue-600 font-extrabold uppercase block">Amount Range</span>
+                <span className="text-xs sm:text-sm font-black text-blue-950 font-mono mt-0.5 block">
+                  {selectedLoan.details.amountRange}
+                </span>
+              </div>
+
+              <div className="p-3 rounded-2xl bg-emerald-50/80 border border-emerald-100">
+                <span className="text-[10px] text-emerald-600 font-extrabold uppercase block">Interest Rate</span>
+                <span className="text-xs sm:text-sm font-black text-emerald-950 mt-0.5 block">
+                  {selectedLoan.details.interestRate}
+                </span>
+              </div>
+
+              <div className="p-3 rounded-2xl bg-indigo-50/80 border border-indigo-100">
+                <span className="text-[10px] text-indigo-600 font-extrabold uppercase block">Tenure</span>
+                <span className="text-xs sm:text-sm font-black text-indigo-950 mt-0.5 block">
+                  {selectedLoan.details.tenureRange}
+                </span>
+              </div>
+            </div>
+
+            {/* Example EMI & Eligibility */}
             <div className="space-y-3 text-xs">
-              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100 space-y-1">
-                <span className="font-bold text-slate-900 block">Who it's for</span>
-                <p className="text-slate-600">{selectedOption.whoItsFor}</p>
+              <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-100 flex items-center justify-between">
+                <span className="font-semibold text-slate-600">Sample Repayment EMI:</span>
+                <span className="font-mono font-black text-slate-900">{selectedLoan.details.sampleEmi}</span>
               </div>
 
-              <div className="bg-slate-50 p-3.5 rounded-xl border border-slate-100 space-y-1">
-                <span className="font-bold text-slate-900 block">Typical use cases</span>
-                <p className="text-slate-600">{selectedOption.useCases}</p>
-              </div>
-
-              <div className="bg-blue-50/70 p-3 rounded-xl border border-blue-100 text-blue-900">
-                <strong>Important note:</strong> {selectedOption.considerations}
+              <div className="bg-slate-50 p-3.5 rounded-2xl border border-slate-100 space-y-1.5">
+                <span className="font-bold text-slate-900 block">Eligibility Basics:</span>
+                {selectedLoan.details.eligibility.map((item, i) => (
+                  <div key={i} className="flex items-center gap-2 text-slate-600 font-medium">
+                    <CheckCircle2 className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
+                    <span>{item}</span>
+                  </div>
+                ))}
               </div>
             </div>
 
-            <div className="flex items-center justify-end gap-2.5 pt-2">
+            {/* Modal Actions */}
+            <div className="pt-2 border-t border-slate-100 flex items-center justify-end gap-3">
               <button
                 type="button"
-                onClick={() => setSelectedOption(null)}
-                className="px-4 py-2 rounded-xl bg-slate-100 hover:bg-slate-200 text-slate-700 font-bold text-xs cursor-pointer"
+                onClick={() => setSelectedLoan(null)}
+                className="px-4 py-2.5 rounded-xl border border-slate-300 text-slate-700 font-bold text-xs hover:bg-slate-50 cursor-pointer"
               >
                 Close
               </button>
@@ -462,19 +696,19 @@ const CompactLoanOptions = ({ onApplyClick }) => {
               <button
                 type="button"
                 onClick={() => {
-                  const loanTitle = selectedOption.title;
-                  setSelectedOption(null);
+                  const loanTitle = selectedLoan.title;
+                  setSelectedLoan(null);
                   onApplyClick(loanTitle);
                 }}
-                className="px-5 py-2 rounded-xl bg-blue-600 hover:bg-blue-700 text-white font-bold text-xs flex items-center gap-1.5 shadow-xs cursor-pointer"
+                className="bg-blue-600 hover:bg-blue-700 text-white font-extrabold text-xs px-6 py-2.5 rounded-xl shadow-md shadow-blue-500/20 transition-all flex items-center gap-2 cursor-pointer"
               >
-                Proceed to Application <ArrowRight className="w-3.5 h-3.5" />
+                Check Eligibility & Apply <ArrowRight className="w-4 h-4" />
               </button>
             </div>
           </div>
         </div>
       )}
-    </div>
+    </section>
   );
 };
 

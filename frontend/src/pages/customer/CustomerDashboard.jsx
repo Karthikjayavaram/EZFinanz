@@ -138,8 +138,12 @@ const CustomerDashboard = () => {
           starting={starting}
         />
 
-        {/* 4. EXPLORE ALL 16 LOAN OPTIONS */}
-        <CompactLoanOptions onApplyClick={handleContinue} />
+        {/* 4. EXPLORE ALL LOAN OPTIONS */}
+        <CompactLoanOptions
+          onApplyClick={handleContinue}
+          application={application}
+          user={user}
+        />
 
         {/* 5. ABOUT EZFINANZ BANNER */}
         <AboutCompanyBanner />

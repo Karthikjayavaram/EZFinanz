@@ -11,7 +11,9 @@ import {
   AlertCircle,
   FileCheck2,
   BadgeCheck,
-  RotateCcw
+  RotateCcw,
+  Eye,
+  EyeOff
 } from 'lucide-react';
 
 const POPULAR_BANKS = [
@@ -30,6 +32,10 @@ export default function BankAccount() {
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState('');
   const [application, setApplication] = useState(null);
+
+  // Eye toggle state for account numbers
+  const [showAccountNumber, setShowAccountNumber] = useState(false);
+  const [showConfirmAccountNumber, setShowConfirmAccountNumber] = useState(false);
 
   // 6. Bank Account Form State
   const [formData, setFormData] = useState({
@@ -370,14 +376,25 @@ export default function BankAccount() {
               <label className="text-xs font-bold text-slate-700 block">
                 Account Number <span className="text-rose-500">*</span>
               </label>
-              <input
-                type="password"
-                value={formData.accountNumber}
-                onChange={(e) => setFormData({ ...formData, accountNumber: e.target.value.replace(/[^0-9]/g, '') })}
-                placeholder="Enter 9-18 digit account number"
-                className="w-full px-3.5 py-2.5 bg-white border border-slate-300 rounded-xl text-sm font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all"
-                required
-              />
+              <div className="relative">
+                <input
+                  type={showAccountNumber ? 'text' : 'password'}
+                  value={formData.accountNumber}
+                  onChange={(e) => setFormData({ ...formData, accountNumber: e.target.value.replace(/[^0-9]/g, '') })}
+                  placeholder="Enter 9-18 digit account number"
+                  className="w-full px-3.5 py-2.5 pr-11 bg-white border border-slate-300 rounded-xl text-sm font-mono font-bold text-slate-900 focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600 transition-all"
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowAccountNumber(!showAccountNumber)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 focus:outline-none cursor-pointer"
+                  title={showAccountNumber ? 'Hide account number' : 'Show account number'}
+                  aria-label={showAccountNumber ? 'Hide account number' : 'Show account number'}
+                >
+                  {showAccountNumber ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4 text-slate-500" />}
+                </button>
+              </div>
             </div>
 
             {/* Confirm Account Number */}
@@ -385,20 +402,31 @@ export default function BankAccount() {
               <label className="text-xs font-bold text-slate-700 block">
                 Confirm Account Number <span className="text-rose-500">*</span>
               </label>
-              <input
-                type="text"
-                value={formData.confirmAccountNumber}
-                onChange={(e) => setFormData({ ...formData, confirmAccountNumber: e.target.value.replace(/[^0-9]/g, '') })}
-                placeholder="Re-enter account number"
-                className={`w-full px-3.5 py-2.5 bg-white border rounded-xl text-sm font-mono font-bold text-slate-900 focus:outline-none transition-all ${
-                  formData.confirmAccountNumber && formData.accountNumber !== formData.confirmAccountNumber
-                    ? 'border-rose-400 focus:ring-2 focus:ring-rose-200'
-                    : 'border-slate-300 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600'
-                }`}
-                required
-              />
+              <div className="relative">
+                <input
+                  type={showConfirmAccountNumber ? 'text' : 'password'}
+                  value={formData.confirmAccountNumber}
+                  onChange={(e) => setFormData({ ...formData, confirmAccountNumber: e.target.value.replace(/[^0-9]/g, '') })}
+                  placeholder="Re-enter account number"
+                  className={`w-full px-3.5 py-2.5 pr-11 bg-white border rounded-xl text-sm font-mono font-bold text-slate-900 focus:outline-none transition-all ${
+                    formData.confirmAccountNumber && formData.accountNumber !== formData.confirmAccountNumber
+                      ? 'border-rose-400 focus:ring-2 focus:ring-rose-200'
+                      : 'border-slate-300 focus:ring-2 focus:ring-blue-500/20 focus:border-blue-600'
+                  }`}
+                  required
+                />
+                <button
+                  type="button"
+                  onClick={() => setShowConfirmAccountNumber(!showConfirmAccountNumber)}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-slate-400 hover:text-slate-600 p-1 focus:outline-none cursor-pointer"
+                  title={showConfirmAccountNumber ? 'Hide confirm account number' : 'Show confirm account number'}
+                  aria-label={showConfirmAccountNumber ? 'Hide confirm account number' : 'Show confirm account number'}
+                >
+                  {showConfirmAccountNumber ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4 text-slate-500" />}
+                </button>
+              </div>
               {formData.confirmAccountNumber && formData.accountNumber !== formData.confirmAccountNumber && (
-                <span className="text-[10px] text-rose-600 block">Account numbers do not match</span>
+                <span className="text-[10px] text-rose-600 block font-medium">Account numbers do not match</span>
               )}
             </div>
 
