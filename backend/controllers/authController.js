@@ -5,10 +5,17 @@ import AuditLog from '../models/AuditLog.js';
 import { OAuth2Client } from 'google-auth-library';
 import otpGenerator from 'otp-generator';
 
-const getGoogleCallbackUrl = () => {
+const getGoogleCallbackUrl = (req) => {
   const envUrl = process.env.GOOGLE_CALLBACK_URL;
   if (envUrl && envUrl.trim()) {
     return envUrl.trim();
+  }
+  if (req) {
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
+    const host = req.headers['x-forwarded-host'] || req.get('host');
+    const isApiPrefix = req.originalUrl && req.originalUrl.includes('/api/auth');
+    const path = isApiPrefix ? '/api/auth/google/callback' : '/auth/google/callback';
+    return `${protocol}://${host}${path}`;
   }
   return process.env.NODE_ENV === 'production'
     ? 'https://ezfinanz-backend-zi64.onrender.com/auth/google/callback'
@@ -24,10 +31,10 @@ const getFrontendUrl = () => {
     : 'http://localhost:5173';
 };
 
-const getGoogleClient = () => {
+const getGoogleClient = (req) => {
   const clientId = (process.env.GOOGLE_CLIENT_ID || '').trim();
   const clientSecret = (process.env.GOOGLE_CLIENT_SECRET || '').trim();
-  const callbackUrl = getGoogleCallbackUrl();
+  const callbackUrl = getGoogleCallbackUrl(req);
   return new OAuth2Client(clientId, clientSecret, callbackUrl);
 };
 
@@ -308,7 +315,7 @@ export const googleAuthInitiate = (req, res) => {
     console.error('[Google OAuth ERROR] GOOGLE_CLIENT_ID is missing in environment variables.');
     return res.status(400).json({ success: false, message: 'Google Client ID is missing in server environment.' });
   }
-  const callbackUrl = getGoogleCallbackUrl();
+  const callbackUrl = getGoogleCallbackUrl(req);
   console.log(`[Google OAuth] Initiating OAuth flow with callback URI: ${callbackUrl}`);
   const redirectUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(callbackUrl)}&response_type=code&scope=email%20profile&access_type=offline&prompt=consent`;
   res.redirect(redirectUrl);
@@ -320,39 +327,60 @@ export const googleAuthInitiate = (req, res) => {
 export const googleAuthCallback = async (req, res) => {
   const { code, error: googleError } = req.query;
   const FRONTEND_URL = getFrontendUrl();
-  const callbackUrl = getGoogleCallbackUrl();
+  const callbackUrl = getGoogleCallbackUrl(req);
   const clientId = (process.env.GOOGLE_CLIENT_ID || '').trim();
   const clientSecret = (process.env.GOOGLE_CLIENT_SECRET || '').trim();
 
   console.log('[Google OAuth Callback] Received callback:');
   console.log(`- Code present: ${Boolean(code)}`);
   console.log(`- Google error param: ${googleError || 'None'}`);
-  console.log(`- Configured callback URI: ${callbackUrl}`);
-  console.log(`- Client ID set: ${Boolean(clientId)}`);
-  console.log(`- Client Secret set: ${Boolean(clientSecret)}`);
+  console.log(`- Resolved callback URI: ${callbackUrl}`);
+  console.log(`- Client ID set: ${Boolean(clientId)} (Length: ${clientId.length})`);
+  console.log(`- Client Secret set: ${Boolean(clientSecret)} (Length: ${clientSecret.length})`);
   console.log(`- JWT Secret set: ${Boolean(process.env.JWT_SECRET)}`);
   console.log(`- Frontend redirect URL: ${FRONTEND_URL}`);
 
   if (googleError) {
     console.error(`[Google OAuth Callback ERROR] Google returned an error query: ${googleError}`);
-    return res.redirect(`${FRONTEND_URL}/login?error=Google authentication was declined or cancelled.`);
+    return res.redirect(`${FRONTEND_URL}/login?error=Google authentication was declined: ${encodeURIComponent(googleError)}`);
   }
 
   if (!code) {
     console.error('[Google OAuth Callback ERROR] No authorization code in query parameters.');
-    return res.redirect(`${FRONTEND_URL}/login?error=Google authentication failed. Please try again.`);
+    return res.redirect(`${FRONTEND_URL}/login?error=Google authentication failed: missing authorization code.`);
   }
 
   try {
-    const googleClient = getGoogleClient();
+    const googleClient = getGoogleClient(req);
 
-    console.log('[Google OAuth Callback] Exchanging authorization code with Google token endpoint...');
-    const { tokens } = await googleClient.getToken({
-      code,
-      redirect_uri: callbackUrl,
-    });
+    console.log(`[Google OAuth Callback] Exchanging authorization code with Google (redirect_uri: ${callbackUrl})...`);
+    let tokens = null;
+    try {
+      const tokenRes = await googleClient.getToken({
+        code: String(code).trim(),
+        redirect_uri: callbackUrl,
+      });
+      tokens = tokenRes.tokens;
+    } catch (primaryErr) {
+      console.warn(`[Google OAuth Callback] Primary token exchange failed with redirect_uri "${callbackUrl}":`, primaryErr.message);
+      if (primaryErr.response?.data) {
+        console.warn('- Primary Google error response:', JSON.stringify(primaryErr.response.data));
+      }
+
+      // Try alternative callback URI (/api/auth/google/callback <-> /auth/google/callback)
+      const altCallbackUrl = callbackUrl.includes('/api/auth/google/callback')
+        ? callbackUrl.replace('/api/auth/google/callback', '/auth/google/callback')
+        : callbackUrl.replace('/auth/google/callback', '/api/auth/google/callback');
+
+      console.log(`[Google OAuth Callback] Attempting token exchange with alternative redirect_uri "${altCallbackUrl}"...`);
+      const altTokenRes = await googleClient.getToken({
+        code: String(code).trim(),
+        redirect_uri: altCallbackUrl,
+      });
+      tokens = altTokenRes.tokens;
+    }
+
     console.log('[Google OAuth Callback] Successfully received tokens from Google.');
-
     googleClient.setCredentials(tokens);
 
     let email = null;
@@ -367,10 +395,10 @@ export const googleAuthCallback = async (req, res) => {
           audience: clientId,
         });
         const payload = ticket.getPayload();
-        email = payload.email;
-        name = payload.name;
-        googleId = payload.sub;
-        picture = payload.picture;
+        email = payload?.email;
+        name = payload?.name;
+        googleId = payload?.sub;
+        picture = payload?.picture;
       } catch (verifyErr) {
         console.warn('[Google OAuth Callback] verifyIdToken failed, attempting userinfo endpoint fallback:', verifyErr.message);
       }
@@ -426,16 +454,18 @@ export const googleAuthCallback = async (req, res) => {
     console.log(`[Google OAuth Callback] Authentication successful. Redirecting user to frontend: ${FRONTEND_URL}/oauth-success`);
     res.redirect(`${FRONTEND_URL}/oauth-success?token=${token}`);
   } catch (error) {
+    const errorType = error.response?.data?.error || error.name || 'OAuthError';
+    const errorDescription = error.response?.data?.error_description || error.message || 'Unknown error';
     console.error('[Google OAuth Callback ERROR] Exception during Google OAuth processing:');
-    console.error('- Message:', error.message);
+    console.error('- Error Type:', errorType);
+    console.error('- Error Description:', errorDescription);
     if (error.response?.data) {
       console.error('- Google API Error Data:', JSON.stringify(error.response.data));
     }
     if (error.stack) {
       console.error('- Stack Trace:', error.stack);
     }
-    const errorDetail = error.response?.data?.error_description || error.response?.data?.error || error.message || 'Unknown error';
-    res.redirect(`${FRONTEND_URL}/login?error=Google authentication failed: ${encodeURIComponent(errorDetail)}`);
+    res.redirect(`${FRONTEND_URL}/login?error=Google authentication failed (${encodeURIComponent(`${errorType}: ${errorDescription}`)}). Please try again.`);
   }
 };
 
