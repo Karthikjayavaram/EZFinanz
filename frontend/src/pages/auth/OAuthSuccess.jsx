@@ -20,12 +20,15 @@ const OAuthSuccess = () => {
 
       const res = await loginWithToken(token);
       if (res.success) {
+        const userData = res.data;
         // Check if phone number is missing
-        if (!res.data.phone) {
+        if (!userData.phone) {
           navigate('/complete-profile', { replace: true });
+        } else if (!userData.emailVerified || !userData.phoneVerified) {
+          navigate('/verify', { replace: true });
         } else {
-          // If phone number exists, proceed to dashboard
-          if (res.data.role === 'ADMIN') {
+          // If phone number exists and is verified, proceed to dashboard
+          if (userData.role === 'ADMIN') {
             navigate('/admin/dashboard', { replace: true });
           } else {
             navigate('/customer/dashboard', { replace: true });

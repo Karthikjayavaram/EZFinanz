@@ -27,10 +27,13 @@ const CompleteProfile = () => {
       const res = await api.post('/auth/add-details', { phone: data.phone });
       if (res.data.success) {
         updateSession(res.data.data);
-        if (user.role === 'ADMIN') {
-          navigate('/admin/dashboard');
+        const updated = res.data.data;
+        if (!updated.emailVerified || !updated.phoneVerified) {
+          navigate('/verify', { replace: true });
+        } else if (updated.role === 'ADMIN') {
+          navigate('/admin/dashboard', { replace: true });
         } else {
-          navigate('/customer/dashboard');
+          navigate('/customer/dashboard', { replace: true });
         }
       }
     } catch (err) {

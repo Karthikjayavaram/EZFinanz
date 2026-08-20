@@ -28,8 +28,16 @@ import AdminApplicationDetail from './pages/admin/AdminApplicationDetail';
 import MainLayout from './layouts/MainLayout';
 import AdminLayout from './layouts/AdminLayout';
 
+// Helper to get correct landing route based on user verification and role
+const getAuthenticatedRedirect = (user) => {
+  if (!user) return '/login';
+  if (!user.phone) return '/complete-profile';
+  if (!user.emailVerified || !user.phoneVerified) return '/verify';
+  return user.role === 'ADMIN' ? '/admin/dashboard' : '/customer/dashboard';
+};
+
 // Role-Protected Route Guard
-const ProtectedRoute = ({ children, allowedRole }) => {
+const ProtectedRoute = ({ children, allowedRole, requireVerification = true }) => {
   const { user, loading } = useAuth();
   
   if (loading) {
@@ -45,12 +53,19 @@ const ProtectedRoute = ({ children, allowedRole }) => {
     return <Navigate to="/login" replace />;
   }
 
-  // 2. Role-based check
-  if (allowedRole && user.role !== allowedRole) {
-    if (user.role === 'ADMIN') {
-      return <Navigate to="/admin/dashboard" replace />;
+  // 2. Unverified users must complete verification before accessing dashboard
+  if (requireVerification) {
+    if (!user.phone) {
+      return <Navigate to="/complete-profile" replace />;
     }
-    return <Navigate to="/customer/dashboard" replace />;
+    if (!user.emailVerified || !user.phoneVerified) {
+      return <Navigate to="/verify" replace />;
+    }
+  }
+
+  // 3. Role-based check
+  if (allowedRole && user.role !== allowedRole) {
+    return <Navigate to={getAuthenticatedRedirect(user)} replace />;
   }
 
   return children;
@@ -69,7 +84,7 @@ const PublicRoute = ({ children }) => {
   }
 
   if (user) {
-    return <Navigate to={user.role === 'ADMIN' ? '/admin/dashboard' : '/customer/dashboard'} replace />;
+    return <Navigate to={getAuthenticatedRedirect(user)} replace />;
   }
 
   return children;
@@ -86,11 +101,7 @@ const RootRedirect = () => {
     );
   }
 
-  if (!user) {
-    return <Navigate to="/login" replace />;
-  }
-
-  return <Navigate to={user.role === 'ADMIN' ? '/admin/dashboard' : '/customer/dashboard'} replace />;
+  return <Navigate to={getAuthenticatedRedirect(user)} replace />;
 };
 
 const AppRoutes = () => {

@@ -37,7 +37,12 @@ const Login = () => {
     setError('');
     const res = await login(data.email, data.password);
     if (res.success) {
-      if (res.data?.role === 'ADMIN') {
+      const userData = res.data;
+      if (!userData?.phone) {
+        navigate('/complete-profile');
+      } else if (!userData?.emailVerified || !userData?.phoneVerified) {
+        navigate('/verify');
+      } else if (userData?.role === 'ADMIN') {
         navigate('/admin/dashboard');
       } else {
         navigate('/customer/dashboard');
