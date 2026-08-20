@@ -10,31 +10,89 @@ const getGoogleCallbackUrl = (req) => {
   if (envUrl && envUrl.trim()) {
     return envUrl.trim();
   }
+
   if (req) {
-    const protocol = req.headers['x-forwarded-proto'] || req.protocol || 'https';
-    const host = req.headers['x-forwarded-host'] || req.get('host');
-    const isApiPrefix = req.originalUrl && req.originalUrl.includes('/api/auth');
-    const path = isApiPrefix ? '/api/auth/google/callback' : '/auth/google/callback';
-    return `${protocol}://${host}${path}`;
+    const host = req.headers['x-forwarded-host'] || req.get('host') || '';
+    const isLocalhost = host.includes('localhost') || host.includes('127.0.0.1');
+    const protocol = req.headers['x-forwarded-proto'] || req.protocol || (isLocalhost ? 'http' : 'https');
+    const isApi = req.originalUrl && req.originalUrl.includes('/api/auth');
+    if (host) {
+      return `${protocol}://${host}${isApi ? '/api/auth/google/callback' : '/auth/google/callback'}`;
+    }
   }
-  return process.env.NODE_ENV === 'production'
-    ? 'https://ezfinanz-backend-zi64.onrender.com/auth/google/callback'
-    : 'http://localhost:5000/auth/google/callback';
+
+  if (process.env.NODE_ENV !== 'production') {
+    return 'http://localhost:5000/auth/google/callback';
+  }
+
+  return 'https://ezfinanz-backend-zi64.onrender.com/auth/google/callback';
 };
 
-const getFrontendUrl = () => {
+const isSafeFrontendOrigin = (url) => {
+  if (!url) return false;
+  try {
+    const cleanUrl = url.trim().replace(/\/+$/, '');
+    if (/^https:\/\/[a-zA-Z0-9_\-.]+\.vercel\.app$/.test(cleanUrl)) return true;
+    if (/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(cleanUrl)) return true;
+    if (process.env.FRONTEND_URL) {
+      const configured = process.env.FRONTEND_URL.split(',').map((u) => u.trim().replace(/\/+$/, ''));
+      if (configured.includes(cleanUrl)) return true;
+    }
+    if (/^https?:\/\/[a-zA-Z0-9_\-.]+(:\d+)?$/.test(cleanUrl)) return true;
+  } catch {}
+  return false;
+};
+
+const getFrontendUrl = (req) => {
+  // 1. If state parameter is returned by Google OAuth (dynamic from the exact frontend origin that initiated the login)
+  if (req?.query?.state) {
+    try {
+      const stateUrl = decodeURIComponent(req.query.state).trim().replace(/\/+$/, '');
+      if (isSafeFrontendOrigin(stateUrl)) {
+        return stateUrl;
+      }
+    } catch {}
+  }
+
+  // 2. If origin or referer header is provided in the request
+  if (req) {
+    const originHeader = req.headers['origin'] || req.headers['referer'] || '';
+    if (originHeader) {
+      try {
+        const originUrl = new URL(originHeader).origin;
+        if (isSafeFrontendOrigin(originUrl) && !originUrl.includes('google.com')) {
+          return originUrl;
+        }
+      } catch {}
+    }
+  }
+
+  // 3. If FRONTEND_URL environment variable is set
   if (process.env.FRONTEND_URL && process.env.FRONTEND_URL.trim()) {
-    return process.env.FRONTEND_URL.split(',')[0].trim().replace(/\/+$/, '');
+    const urls = process.env.FRONTEND_URL.split(',').map((u) => u.trim().replace(/\/+$/, '')).filter(Boolean);
+    const prodUrl = urls.find((u) => !u.includes('localhost') && !u.includes('127.0.0.1'));
+    if (prodUrl) return prodUrl;
+    if (urls.length > 0) return urls[0];
   }
-  return process.env.NODE_ENV === 'production'
-    ? 'https://ez-finanz-git-main-karthiks-projects-d43876c0.vercel.app'
-    : 'http://localhost:5173';
+
+  // 4. If request is from localhost
+  if (req) {
+    const host = req.headers['x-forwarded-host'] || req.get('host') || '';
+    if (host.includes('localhost') || host.includes('127.0.0.1')) {
+      return 'http://localhost:5173';
+    }
+  }
+
+  // 5. Default fallback for production
+  return 'https://ez-finanz-git-main-karthiks-projects-d43876c0.vercel.app';
 };
 
-const getGoogleClient = (req) => {
+const getGoogleClient = (callbackUrlOrReq) => {
   const clientId = (process.env.GOOGLE_CLIENT_ID || '').trim();
   const clientSecret = (process.env.GOOGLE_CLIENT_SECRET || '').trim();
-  const callbackUrl = getGoogleCallbackUrl(req);
+  const callbackUrl = typeof callbackUrlOrReq === 'string'
+    ? callbackUrlOrReq
+    : getGoogleCallbackUrl(callbackUrlOrReq);
   return new OAuth2Client(clientId, clientSecret, callbackUrl);
 };
 
@@ -315,9 +373,28 @@ export const googleAuthInitiate = (req, res) => {
     console.error('[Google OAuth ERROR] GOOGLE_CLIENT_ID is missing in environment variables.');
     return res.status(400).json({ success: false, message: 'Google Client ID is missing in server environment.' });
   }
+
+  // Determine calling client origin (e.g. from frontend origin param or referer)
+  let clientOrigin = req.query.origin || req.query.redirect_origin || '';
+  if (!clientOrigin && req.headers.referer) {
+    try {
+      const parsed = new URL(req.headers.referer);
+      clientOrigin = parsed.origin;
+    } catch {}
+  }
+  if (!clientOrigin) {
+    clientOrigin = getFrontendUrl(req);
+  }
+
   const callbackUrl = getGoogleCallbackUrl(req);
-  console.log(`[Google OAuth] Initiating OAuth flow with callback URI: ${callbackUrl}`);
-  const redirectUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(callbackUrl)}&response_type=code&scope=email%20profile&access_type=offline&prompt=consent`;
+  
+  // Pack origin and the EXACT callbackUrl into base64url state so callback uses identical redirect_uri
+  const statePayload = Buffer.from(
+    JSON.stringify({ origin: clientOrigin, callbackUrl })
+  ).toString('base64url');
+
+  console.log(`[Google OAuth] Initiating OAuth flow with callback URI: ${callbackUrl}, target origin: ${clientOrigin}`);
+  const redirectUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(callbackUrl)}&response_type=code&scope=email%20profile&access_type=offline&prompt=consent&state=${statePayload}`;
   res.redirect(redirectUrl);
 };
 
@@ -325,9 +402,28 @@ export const googleAuthInitiate = (req, res) => {
 // @route   GET /api/auth/google/callback and /auth/google/callback
 // @access  Public
 export const googleAuthCallback = async (req, res) => {
-  const { code, error: googleError } = req.query;
-  const FRONTEND_URL = getFrontendUrl();
-  const callbackUrl = getGoogleCallbackUrl(req);
+  const { code, error: googleError, state } = req.query;
+
+  let stateOrigin = '';
+  let stateCallbackUrl = '';
+
+  if (state) {
+    try {
+      const decoded = Buffer.from(state, 'base64url').toString('utf8');
+      const parsed = JSON.parse(decoded);
+      if (parsed.origin) stateOrigin = parsed.origin;
+      if (parsed.callbackUrl) stateCallbackUrl = parsed.callbackUrl;
+    } catch {
+      // If state was a simple plain string (URL)
+      stateOrigin = state;
+    }
+  }
+
+  const FRONTEND_URL = stateOrigin && isSafeFrontendOrigin(stateOrigin)
+    ? stateOrigin
+    : getFrontendUrl(req);
+
+  const callbackUrl = stateCallbackUrl || getGoogleCallbackUrl(req);
   const clientId = (process.env.GOOGLE_CLIENT_ID || '').trim();
   const clientSecret = (process.env.GOOGLE_CLIENT_SECRET || '').trim();
 
@@ -351,7 +447,7 @@ export const googleAuthCallback = async (req, res) => {
   }
 
   try {
-    const googleClient = getGoogleClient(req);
+    const googleClient = getGoogleClient(callbackUrl);
 
     console.log(`[Google OAuth Callback] Exchanging authorization code with Google (redirect_uri: ${callbackUrl})...`);
     let tokens = null;
@@ -373,7 +469,8 @@ export const googleAuthCallback = async (req, res) => {
         : callbackUrl.replace('/auth/google/callback', '/api/auth/google/callback');
 
       console.log(`[Google OAuth Callback] Attempting token exchange with alternative redirect_uri "${altCallbackUrl}"...`);
-      const altTokenRes = await googleClient.getToken({
+      const altClient = getGoogleClient(altCallbackUrl);
+      const altTokenRes = await altClient.getToken({
         code: String(code).trim(),
         redirect_uri: altCallbackUrl,
       });
