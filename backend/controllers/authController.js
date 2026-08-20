@@ -434,7 +434,8 @@ export const googleAuthCallback = async (req, res) => {
     if (error.stack) {
       console.error('- Stack Trace:', error.stack);
     }
-    res.redirect(`${FRONTEND_URL}/login?error=Google authentication failed. Please try again.`);
+    const errorDetail = error.response?.data?.error_description || error.response?.data?.error || error.message || 'Unknown error';
+    res.redirect(`${FRONTEND_URL}/login?error=Google authentication failed: ${encodeURIComponent(errorDetail)}`);
   }
 };
 
