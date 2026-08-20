@@ -98,7 +98,7 @@ const SanctionLetterModal = ({ isOpen, onClose, application, user }) => {
               <p className="text-[11px] text-slate-500 font-medium leading-relaxed max-w-sm">
                 EZFinanz Credit Technologies Private Limited<br />
                 Licensed Digital NBFC Lending Partner • RBI Regulated<br />
-                CIN: U65929KA2024PTC123456 • support@ezfinanz.com
+                CIN: U65929KA2024PTC123456 • karthik.jayavaram@gmail.com
               </p>
             </div>
 

@@ -118,15 +118,15 @@ const DashboardFooter = () => {
             <ul className="space-y-2.5 text-xs text-slate-400">
               <li className="flex items-center gap-2">
                 <Mail className="w-3.5 h-3.5 text-blue-400 shrink-0" />
-                <span>support@ezfinanz.com</span>
+                <span>karthik.jayavaram@gmail.com</span>
               </li>
               <li className="flex items-center gap-2">
                 <Phone className="w-3.5 h-3.5 text-emerald-400 shrink-0" />
-                <span>1800-200-FINANZ</span>
+                <span>+91 6301015578</span>
               </li>
               <li className="flex items-start gap-2">
                 <MapPin className="w-3.5 h-3.5 text-rose-400 shrink-0 mt-0.5" />
-                <span>Fintech Tower, MG Road, Bengaluru, India</span>
+                <span>Plot No. 42, Road No. 36, Jubilee Hills, Hyderabad, Telangana 500033, India</span>
               </li>
             </ul>
           </div>

@@ -279,7 +279,7 @@ const KYCForm = () => {
                 onChange={handleChange}
                 required
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                placeholder="John Doe"
+                placeholder="Karthik Jayavaram"
               />
             </div>
             
@@ -345,7 +345,7 @@ const KYCForm = () => {
                 required
                 rows="3"
                 className="w-full px-4 py-2 border border-slate-300 rounded-lg focus:ring-2 focus:ring-blue-500 focus:outline-none"
-                placeholder="123 Main St, City, State, ZIP"
+                placeholder="Plot No. 42, Road No. 36, Jubilee Hills, Hyderabad, Telangana 500033"
               ></textarea>
             </div>
           </div>

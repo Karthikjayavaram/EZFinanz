@@ -80,7 +80,7 @@ const Login = () => {
                 {...register('email')}
                 type="email"
                 className="appearance-none block w-full px-4 py-3 border border-slate-300 rounded-lg shadow-sm placeholder-slate-400 focus:outline-none focus:ring-blue-500 focus:border-blue-500 sm:text-sm"
-                placeholder="you@example.com"
+                placeholder="karthik.jayavaram@gmail.com"
               />
               {errors.email && <p className="mt-1 text-sm text-red-600">{errors.email.message}</p>}
             </div>
