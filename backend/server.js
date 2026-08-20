@@ -25,31 +25,65 @@ const app = express();
 app.use(express.json({ limit: '50mb' }));
 app.use(express.urlencoded({ limit: '50mb', extended: true }));
 
-const allowedOrigins = [
-  process.env.FRONTEND_URL,
+// Allowed origins configuration
+const configuredOrigins = (process.env.FRONTEND_URL || '')
+  .split(',')
+  .map((url) => url.trim().replace(/\/+$/, ''))
+  .filter(Boolean);
+
+const defaultOrigins = [
+  'https://ez-finanz-git-main-karthiks-projects-d43876c0.vercel.app',
+  'https://ezfinanz-backend-zi64.onrender.com',
   'http://localhost:5173',
   'http://localhost:3000',
   'http://127.0.0.1:5173',
   'http://localhost:5000'
-].filter(Boolean);
+];
+
+const isAllowedOrigin = (origin) => {
+  if (!origin) return true;
+  const cleanOrigin = origin.replace(/\/+$/, '');
+
+  if (configuredOrigins.includes(cleanOrigin) || defaultOrigins.includes(cleanOrigin)) {
+    return true;
+  }
+
+  // Allow all Vercel deployment and preview subdomains (*.vercel.app)
+  if (/^https:\/\/[a-zA-Z0-9_\-.]+\.vercel\.app$/.test(cleanOrigin)) {
+    return true;
+  }
+
+  // Allow localhost on any port for local development
+  if (/^http:\/\/(localhost|127\.0\.0\.1)(:\d+)?$/.test(cleanOrigin)) {
+    return true;
+  }
+
+  if (process.env.NODE_ENV !== 'production') {
+    return true;
+  }
+
+  return false;
+};
 
 app.use(
   cors({
     origin: (origin, callback) => {
-      // Allow requests with no origin (e.g., mobile apps, curl, server-to-server)
-      if (!origin) return callback(null, true);
-      if (allowedOrigins.indexOf(origin) !== -1 || process.env.NODE_ENV !== 'production') {
+      if (isAllowedOrigin(origin)) {
         return callback(null, true);
       }
-      return callback(new Error('CORS policy: Access from this origin is not allowed.'));
+      return callback(new Error(`CORS policy: Origin ${origin} not allowed.`));
     },
     credentials: true,
     methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
-    allowedHeaders: ['Content-Type', 'Authorization'],
+    allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With'],
   })
 );
 
-app.use(helmet());
+app.use(
+  helmet({
+    crossOriginResourcePolicy: { policy: 'cross-origin' },
+  })
+);
 if (process.env.NODE_ENV !== 'production') {
   app.use(morgan('dev'));
 }

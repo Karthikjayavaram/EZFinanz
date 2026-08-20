@@ -5,11 +5,31 @@ import AuditLog from '../models/AuditLog.js';
 import { OAuth2Client } from 'google-auth-library';
 import otpGenerator from 'otp-generator';
 
-const googleClient = new OAuth2Client(
-  process.env.GOOGLE_CLIENT_ID || 'dummy_client_id',
-  process.env.GOOGLE_CLIENT_SECRET || 'dummy_secret',
-  process.env.GOOGLE_CALLBACK_URL || 'http://localhost:5000/api/auth/google/callback'
-);
+const getGoogleCallbackUrl = () => {
+  return (
+    process.env.GOOGLE_CALLBACK_URL ||
+    (process.env.NODE_ENV === 'production'
+      ? 'https://ezfinanz-backend-zi64.onrender.com/api/auth/google/callback'
+      : 'http://localhost:5000/api/auth/google/callback')
+  );
+};
+
+const getFrontendUrl = () => {
+  if (process.env.FRONTEND_URL) {
+    return process.env.FRONTEND_URL.split(',')[0].trim().replace(/\/+$/, '');
+  }
+  return process.env.NODE_ENV === 'production'
+    ? 'https://ez-finanz-git-main-karthiks-projects-d43876c0.vercel.app'
+    : 'http://localhost:5173';
+};
+
+const getGoogleClient = () => {
+  return new OAuth2Client(
+    process.env.GOOGLE_CLIENT_ID || 'dummy_client_id',
+    process.env.GOOGLE_CLIENT_SECRET || 'dummy_secret',
+    getGoogleCallbackUrl()
+  );
+};
 
 const sendVerificationEmail = async (toEmail, otp) => {
   const subject = 'Your EZFINANZ Email Verification Code';
@@ -286,7 +306,8 @@ export const googleAuthInitiate = (req, res) => {
   if (!process.env.GOOGLE_CLIENT_ID) {
     return res.status(400).json({ success: false, message: 'Google Client ID is missing' });
   }
-  const redirectUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(process.env.GOOGLE_CALLBACK_URL)}&response_type=code&scope=email%20profile`;
+  const callbackUrl = getGoogleCallbackUrl();
+  const redirectUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(callbackUrl)}&response_type=code&scope=email%20profile`;
   res.redirect(redirectUrl);
 };
 
@@ -295,15 +316,18 @@ export const googleAuthInitiate = (req, res) => {
 // @access  Public
 export const googleAuthCallback = async (req, res) => {
   const { code } = req.query;
-  const FRONTEND_URL = process.env.FRONTEND_URL || 'http://localhost:5173';
+  const FRONTEND_URL = getFrontendUrl();
   if (!code) {
     return res.redirect(`${FRONTEND_URL}/login?error=Google authentication failed. Please try again.`);
   }
 
   try {
+    const googleClient = getGoogleClient();
+    const callbackUrl = getGoogleCallbackUrl();
+
     const { tokens } = await googleClient.getToken({
       code,
-      redirect_uri: process.env.GOOGLE_CALLBACK_URL,
+      redirect_uri: callbackUrl,
     });
     
     const ticket = await googleClient.verifyIdToken({
@@ -335,7 +359,7 @@ export const googleAuthCallback = async (req, res) => {
     const token = generateToken(user._id);
     res.redirect(`${FRONTEND_URL}/oauth-success?token=${token}`);
   } catch (error) {
-    console.error(error);
+    console.error('Google OAuth Callback Error:', error);
     res.redirect(`${FRONTEND_URL}/login?error=Google authentication failed. Please try again.`);
   }
 };
