@@ -14,7 +14,7 @@ const OAuthSuccess = () => {
       const token = queryParams.get('token');
 
       if (!token) {
-        navigate('/login?error=Invalid authentication response');
+        navigate('/login?error=Invalid authentication response', { replace: true });
         return;
       }
 
@@ -22,19 +22,19 @@ const OAuthSuccess = () => {
       if (res.success) {
         // Check if phone number is missing
         if (!res.data.phone) {
-          navigate('/complete-profile');
+          navigate('/complete-profile', { replace: true });
         } else {
           // If phone number exists, proceed to dashboard
           if (res.data.role === 'ADMIN') {
-            navigate('/admin/dashboard');
+            navigate('/admin/dashboard', { replace: true });
           } else {
-            navigate('/customer/dashboard');
+            navigate('/customer/dashboard', { replace: true });
           }
         }
       } else {
         setError(res.message);
         setTimeout(() => {
-          navigate('/login?error=' + encodeURIComponent(res.message));
+          navigate('/login?error=' + encodeURIComponent(res.message), { replace: true });
         }, 2000);
       }
     };

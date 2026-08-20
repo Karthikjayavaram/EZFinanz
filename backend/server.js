@@ -20,6 +20,7 @@ connectDB().then(async () => {
 });
 
 const app = express();
+app.set('trust proxy', 1);
 
 // Middleware
 app.use(express.json({ limit: '50mb' }));
@@ -89,6 +90,7 @@ if (process.env.NODE_ENV !== 'production') {
 }
 
 // Routes
+app.use('/auth', authRoutes);
 app.use('/api/auth', authRoutes);
 app.use('/api/applications', applicationRoutes);
 app.use('/api/admin', adminRoutes);

@@ -6,16 +6,17 @@ import { OAuth2Client } from 'google-auth-library';
 import otpGenerator from 'otp-generator';
 
 const getGoogleCallbackUrl = () => {
-  return (
-    process.env.GOOGLE_CALLBACK_URL ||
-    (process.env.NODE_ENV === 'production'
-      ? 'https://ezfinanz-backend-zi64.onrender.com/api/auth/google/callback'
-      : 'http://localhost:5000/api/auth/google/callback')
-  );
+  const envUrl = process.env.GOOGLE_CALLBACK_URL;
+  if (envUrl && envUrl.trim()) {
+    return envUrl.trim();
+  }
+  return process.env.NODE_ENV === 'production'
+    ? 'https://ezfinanz-backend-zi64.onrender.com/auth/google/callback'
+    : 'http://localhost:5000/auth/google/callback';
 };
 
 const getFrontendUrl = () => {
-  if (process.env.FRONTEND_URL) {
+  if (process.env.FRONTEND_URL && process.env.FRONTEND_URL.trim()) {
     return process.env.FRONTEND_URL.split(',')[0].trim().replace(/\/+$/, '');
   }
   return process.env.NODE_ENV === 'production'
@@ -24,11 +25,10 @@ const getFrontendUrl = () => {
 };
 
 const getGoogleClient = () => {
-  return new OAuth2Client(
-    process.env.GOOGLE_CLIENT_ID || 'dummy_client_id',
-    process.env.GOOGLE_CLIENT_SECRET || 'dummy_secret',
-    getGoogleCallbackUrl()
-  );
+  const clientId = (process.env.GOOGLE_CLIENT_ID || '').trim();
+  const clientSecret = (process.env.GOOGLE_CLIENT_SECRET || '').trim();
+  const callbackUrl = getGoogleCallbackUrl();
+  return new OAuth2Client(clientId, clientSecret, callbackUrl);
 };
 
 const sendVerificationEmail = async (toEmail, otp) => {
@@ -303,63 +303,137 @@ export const verifyLoginPhone = async (req, res) => {
 // @route   GET /api/auth/google
 // @access  Public
 export const googleAuthInitiate = (req, res) => {
-  if (!process.env.GOOGLE_CLIENT_ID) {
-    return res.status(400).json({ success: false, message: 'Google Client ID is missing' });
+  const clientId = (process.env.GOOGLE_CLIENT_ID || '').trim();
+  if (!clientId) {
+    console.error('[Google OAuth ERROR] GOOGLE_CLIENT_ID is missing in environment variables.');
+    return res.status(400).json({ success: false, message: 'Google Client ID is missing in server environment.' });
   }
   const callbackUrl = getGoogleCallbackUrl();
-  const redirectUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${process.env.GOOGLE_CLIENT_ID}&redirect_uri=${encodeURIComponent(callbackUrl)}&response_type=code&scope=email%20profile`;
+  console.log(`[Google OAuth] Initiating OAuth flow with callback URI: ${callbackUrl}`);
+  const redirectUrl = `https://accounts.google.com/o/oauth2/v2/auth?client_id=${clientId}&redirect_uri=${encodeURIComponent(callbackUrl)}&response_type=code&scope=email%20profile&access_type=offline&prompt=consent`;
   res.redirect(redirectUrl);
 };
 
 // @desc    Google OAuth Callback
-// @route   GET /api/auth/google/callback
+// @route   GET /api/auth/google/callback and /auth/google/callback
 // @access  Public
 export const googleAuthCallback = async (req, res) => {
-  const { code } = req.query;
+  const { code, error: googleError } = req.query;
   const FRONTEND_URL = getFrontendUrl();
+  const callbackUrl = getGoogleCallbackUrl();
+  const clientId = (process.env.GOOGLE_CLIENT_ID || '').trim();
+  const clientSecret = (process.env.GOOGLE_CLIENT_SECRET || '').trim();
+
+  console.log('[Google OAuth Callback] Received callback:');
+  console.log(`- Code present: ${Boolean(code)}`);
+  console.log(`- Google error param: ${googleError || 'None'}`);
+  console.log(`- Configured callback URI: ${callbackUrl}`);
+  console.log(`- Client ID set: ${Boolean(clientId)}`);
+  console.log(`- Client Secret set: ${Boolean(clientSecret)}`);
+  console.log(`- JWT Secret set: ${Boolean(process.env.JWT_SECRET)}`);
+  console.log(`- Frontend redirect URL: ${FRONTEND_URL}`);
+
+  if (googleError) {
+    console.error(`[Google OAuth Callback ERROR] Google returned an error query: ${googleError}`);
+    return res.redirect(`${FRONTEND_URL}/login?error=Google authentication was declined or cancelled.`);
+  }
+
   if (!code) {
+    console.error('[Google OAuth Callback ERROR] No authorization code in query parameters.');
     return res.redirect(`${FRONTEND_URL}/login?error=Google authentication failed. Please try again.`);
   }
 
   try {
     const googleClient = getGoogleClient();
-    const callbackUrl = getGoogleCallbackUrl();
 
+    console.log('[Google OAuth Callback] Exchanging authorization code with Google token endpoint...');
     const { tokens } = await googleClient.getToken({
       code,
       redirect_uri: callbackUrl,
     });
-    
-    const ticket = await googleClient.verifyIdToken({
-      idToken: tokens.id_token,
-      audience: process.env.GOOGLE_CLIENT_ID,
-    });
-    
-    const payload = ticket.getPayload();
-    const { email, name, sub: googleId, picture } = payload;
+    console.log('[Google OAuth Callback] Successfully received tokens from Google.');
 
+    googleClient.setCredentials(tokens);
+
+    let email = null;
+    let name = null;
+    let googleId = null;
+    let picture = null;
+
+    if (tokens.id_token) {
+      try {
+        const ticket = await googleClient.verifyIdToken({
+          idToken: tokens.id_token,
+          audience: clientId,
+        });
+        const payload = ticket.getPayload();
+        email = payload.email;
+        name = payload.name;
+        googleId = payload.sub;
+        picture = payload.picture;
+      } catch (verifyErr) {
+        console.warn('[Google OAuth Callback] verifyIdToken failed, attempting userinfo endpoint fallback:', verifyErr.message);
+      }
+    }
+
+    // Fallback: fetch userinfo directly from Google API if id_token verification was bypassed
+    if (!email && tokens.access_token) {
+      const userInfoRes = await fetch('https://www.googleapis.com/oauth2/v3/userinfo', {
+        headers: { Authorization: `Bearer ${tokens.access_token}` },
+      });
+      if (userInfoRes.ok) {
+        const userInfo = await userInfoRes.json();
+        email = userInfo.email;
+        name = userInfo.name;
+        googleId = userInfo.sub;
+        picture = userInfo.picture;
+      }
+    }
+
+    if (!email) {
+      throw new Error('Unable to extract verified user email from Google token payload.');
+    }
+
+    console.log(`[Google OAuth Callback] User authenticated: ${email} (Google ID: ${googleId})`);
+
+    // Lookup existing user by googleId or email
     let user = await User.findOne({ googleId });
     if (!user) {
       user = await User.findOne({ email });
       if (user) {
-        return res.redirect(`${FRONTEND_URL}/login?error=An account already exists with this email. Please log in using your existing credentials and link Google from account settings.`);
+        console.log(`[Google OAuth Callback] Linking existing account (${email}) with Google ID (${googleId})`);
+        user.googleId = googleId;
+        user.emailVerified = true;
+        if (!user.profilePicture && picture) {
+          user.profilePicture = picture;
+        }
+        await user.save();
+      } else {
+        console.log(`[Google OAuth Callback] Creating new user for: ${email}`);
+        user = await User.create({
+          name: name || email.split('@')[0],
+          email,
+          googleId,
+          profilePicture: picture,
+          authProvider: 'google',
+          emailVerified: true,
+          role: 'CUSTOMER',
+        });
       }
-
-      user = await User.create({
-        name,
-        email,
-        googleId,
-        profilePicture: picture,
-        authProvider: 'google',
-        emailVerified: true,
-        role: 'CUSTOMER'
-      });
     }
 
     const token = generateToken(user._id);
+    console.log(`[Google OAuth Callback] Authentication successful. Redirecting user to frontend: ${FRONTEND_URL}/oauth-success`);
     res.redirect(`${FRONTEND_URL}/oauth-success?token=${token}`);
   } catch (error) {
-    console.error('Google OAuth Callback Error:', error);
+    console.error('[Google OAuth Callback ERROR] Exception during Google OAuth processing:');
+    console.error('- Message:', error.message);
+    if (error.response?.data) {
+      console.error('- Google API Error Data:', JSON.stringify(error.response.data));
+    }
+    if (error.stack) {
+      console.error('- Stack Trace:', error.stack);
+    }
     res.redirect(`${FRONTEND_URL}/login?error=Google authentication failed. Please try again.`);
   }
 };
