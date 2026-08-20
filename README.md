@@ -77,3 +77,4 @@ If `DEMO_MODE=true`, the following accounts are automatically seeded into the da
 - Cloudinary upload is designed but file handling logic would sit above the provided controller schemas.
 "# EZFinanz" 
 "# EZFinanz" 
+"# EZFinanz" 
